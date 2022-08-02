@@ -12,6 +12,7 @@ SPDX-License-Identifier: MIT
 =============================================================
 '''
 
+
 # # Daal4py Linear Regression Example for Distributed Memory Systems [SPMD mode]
 
 # ## IMPORTANT NOTICE
@@ -51,7 +52,8 @@ d4p.daalinit() #initializes the distribution engine
 
 # organizing variables used in the model for prediction
 # each process gets its own data
-infile = "./data/distributed_data/linear_regression_train_" + str(d4p.my_procid()+1) + ".csv"
+infile = f"./data/distributed_data/linear_regression_train_{str(d4p.my_procid()+1)}.csv"
+
 
 # read data
 indep_data = pd.read_csv(infile).drop(["target"], axis=1) # house characteristics
@@ -78,7 +80,8 @@ train_result = d4p.linear_regression_training(distributed=True).compute(indep_da
 model = train_result.model
 print("Here's our model:\n\n\n",model , "\n")
 
-model_filename = './models/daal4py_Distributed_LinearRegression_' + str(d4p.my_procid()+1) + '.sav'
+model_filename = f'./models/daal4py_Distributed_LinearRegression_{str(d4p.my_procid()+1)}.sav'
+
 
 # saving model to a file
 pickle.dump(model, open(model_filename, "wb"))
@@ -114,7 +117,8 @@ predict_result = d4p.linear_regression_prediction().compute(test_data, train_res
 
 
 # now export the results to a CSV file
-results_filename = "./results/daal4py_Distributed_LinearRegression_results" + str(d4p.my_procid()+1) + ".csv"
+results_filename = f"./results/daal4py_Distributed_LinearRegression_results{str(d4p.my_procid()+1)}.csv"
+
 np.savetxt(results_filename, predict_result, delimiter =  ",")
 
 d4p.daalfini() # stops the distribution engine

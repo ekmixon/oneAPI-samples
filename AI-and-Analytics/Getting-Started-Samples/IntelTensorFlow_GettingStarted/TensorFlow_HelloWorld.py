@@ -79,8 +79,8 @@ def main():
     s.run(init)
 
     '''start train step'''
-    for epoch in range(0, EPOCHNUM):
-        for step in range(0, BS_TRAIN):
+    for epoch in range(EPOCHNUM):
+        for step in range(BS_TRAIN):
             x_batch = x_data[step*N:(step+1)*N, :, :, :]
             y_batch = y_data[step*N:(step+1)*N, :, :, :]
             s.run(train, feed_dict={x: x_batch, y: y_batch})

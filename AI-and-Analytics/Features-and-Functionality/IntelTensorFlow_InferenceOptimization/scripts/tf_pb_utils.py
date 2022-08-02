@@ -12,7 +12,7 @@ class TF_PB_Utils:
         return
 
     def parse_pb_in_savemodel(self, folderpath):
-        print('load SaveModel from : {}'.format(folderpath))
+        print(f'load SaveModel from : {folderpath}')
         import tensorflow as tf
         graph = None
         graph = tf.compat.v1.Graph()
@@ -21,7 +21,7 @@ class TF_PB_Utils:
         return graph
 
     def parse_pb_in_graphdef(self, filepath):
-        print('Loading graph definition from :{}'.format(filepath))
+        print(f'Loading graph definition from :{filepath}')
         import tensorflow as tf
         graph_def = None
         graph = None
@@ -30,7 +30,7 @@ class TF_PB_Utils:
                 graph_def = tf.compat.v1.GraphDef()
                 graph_def.ParseFromString(f.read())
 
-            if graph_def == None:
+            if graph_def is None:
                 print(" failures at init a graph_def")
             print('Importing graph')
             with tf.Graph().as_default() as graph:
@@ -46,16 +46,15 @@ class TF_PB_Utils:
                 print(' after import_graph_def ')
             print("finish Importing ")
         except BaseException as e:
-            print(' Error loading the graph definition: {}'.format(str(e)))
+            print(f' Error loading the graph definition: {str(e)}')
             print(" Errors for GraphDef Parsing")
-            pass
         return graph
 
     def parse_pb(self, filepath):
-        print('Parsing PB file : {}'.format(filepath))
+        print(f'Parsing PB file : {filepath}')
         graph = None
         graph = self.parse_pb_in_graphdef(filepath)
-        if graph == None:
+        if graph is None:
             print("Need to parse it as save model")
             filename = filepath.split(os.sep)[-1]
 
@@ -83,17 +82,15 @@ class TF_PB_Utils:
                 #print('- {0} {1} ({2} outputs)'.format(op.type, op.name, len(op.outputs)))
                 op_name = op.name.split('/')[-1]
                 count = op.name.count('/')
-                if count > 6:
-                    count = 6
-                op_list = [0 for i in range(6)]
+                count = min(count, 6)
+                op_list = [0 for _ in range(6)]
                 for i in range(count):
                     op_list[i] = op.name.split('/')[i]
                 writer.writerow({'op_type': op.type, 'op_name': op_name, 'op1': op_list[0], 'op2': op_list[1], 'op3': op_list[2], 'op4': op_list[3], 'op5': op_list[4], 'op6': op_list[5]})
 
     def parse_ops_from_csv(self, filename='out.csv'):
         import pandas as pd
-        data = pd.read_csv(filename, names=self.fnames)
-        return data
+        return pd.read_csv(filename, names=self.fnames)
 
     def draw_pie_chart(self, topo_data, group, topk=10):
         import matplotlib.pyplot as plt
@@ -101,10 +98,9 @@ class TF_PB_Utils:
         fig = plt.figure(figsize=(18, 15))
         ax = fig.add_subplot(111)
         figsize = (13, 15)
-        title = group + "Count Breakdown"
+        title = f"{group}Count Breakdown"
         print(" draw pie chart : ", title)
-        if topk > len(topo_data):
-            topk = len(topo_data)
+        topk = min(topk, len(topo_data))
         topo_data[:topk].plot.pie(
             ax=ax, title=title, figsize=figsize, logx=True, textprops=dict(fontsize=18), autopct='%1.1f%%', labeldistance=1.1)
         box = ax.legend(

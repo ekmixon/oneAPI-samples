@@ -27,7 +27,7 @@ def run_main(unused_args):
   if FLAGS.saved_model_tags == "":
     tag_set = []
   else:
-    tag_set = [tag for tag in inp_tags.split(",")]
+    tag_set = list(inp_tags.split(","))
     avail_tags = saved_model_utils.get_saved_model_tag_sets(input_model_dir)
     found = False
     for tag in tag_set:

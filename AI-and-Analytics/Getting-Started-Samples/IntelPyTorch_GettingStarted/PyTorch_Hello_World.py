@@ -41,10 +41,7 @@ class TestDataset(Dataset):
             return torch.rand(3, 112, 112)
 
     def __len__(self):
-        if self.train:
-            return 100
-        else:
-            return 20
+        return 100 if self.train else 20
 
 '''
 TestModel class is inherited from torch.nn.Module.
@@ -92,9 +89,9 @@ def main():
     Use model.train() to set the model into train mode. Use model.eval() to set the model into inference mode.
     Use for loop with enumerate(instance of DataLoader) to go through the whole dataset for training/inference.
     '''
-    for i in range(0, EPOCHNUM - 1):
+    for _ in range(EPOCHNUM - 1):
         model.train()
-        for batch_index, (data, y_ans) in enumerate(trainLoader):
+        for data, y_ans in trainLoader:
             '''
             1. Clear parameters of optimization function
             2. Do forward-propagation
@@ -115,7 +112,7 @@ def main():
         3. For inference task, user needs to prepack the model’s weight using mkldnn_utils.to_mkldnn(model) to save the weight format conversion overhead. It could bring good performance gain sometime for single batch inference.
         '''
         model_mkldnn = mkldnn.to_mkldnn(model)
-        for batch_index, data in enumerate(testLoader):
+        for data in testLoader:
             y = model_mkldnn(data.to_mkldnn())
 
 if __name__ == '__main__':

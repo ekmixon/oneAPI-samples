@@ -15,7 +15,6 @@ except ImportError as e:
     print(e)
     print("can't import git module")
     has_git = False
-    pass
 
 def do_command(command):
     print("WARNING!! No execution for : ", command)
@@ -75,9 +74,9 @@ class tfProfileHook(tf.estimator.ProfilerHook):
         self.timeline_count = timeline_count
         import os
         ProfileUtilsRoot = os.environ['ProfileUtilsRoot']
-        self.json_fname = ProfileUtilsRoot + "/../" + json_fname
+        self.json_fname = f"{ProfileUtilsRoot}/../{json_fname}"
         if output_dir == "":
-            output_dir = ProfileUtilsRoot + "/../"
+            output_dir = f"{ProfileUtilsRoot}/../"
 
     def begin(self):
         self._next_step = None
@@ -111,11 +110,10 @@ class TensorflowUtils:
 
     def is_mkl_enabled(self):
         major_version = int(tf.__version__.split(".")[0])
-        if major_version >= 2:
-            from tensorflow.python import _pywrap_util_port
-            return _pywrap_util_port.IsMklEnabled()
-        else:
+        if major_version < 2:
             return tf.pywrap_tensorflow.IsMklEnabled()
+        from tensorflow.python import _pywrap_util_port
+        return _pywrap_util_port.IsMklEnabled()
 
 
 class GitOps:
@@ -140,7 +138,6 @@ class GitOps:
                         return ret
             except:
                 print("EXCEPTION : Find commit %s ", keyword)
-                pass
         return ret
 
 
@@ -218,10 +215,7 @@ class ConfigFile:
         self.checkpoint = ''
         self.tf_util = TensorflowUtils()
         self.json_fname = ''
-        if self.tf_util.is_mkl_enabled() is True:
-            self.json_fname = 'mkl_'
-        else:
-            self.json_fname = 'stock_'
+        self.json_fname = 'mkl_' if self.tf_util.is_mkl_enabled() is True else 'stock_'
         self.patches = ''
         self.patched = False
         self.patches_keyword = ''
@@ -242,14 +236,20 @@ class ConfigFile:
         for each_section in config.sections():
             is_supported = True
             for each_key, each_val in config.items(each_section):
-                if each_key == 'mkl-only':
-                    if each_val is not None:
-                        if ast.literal_eval(each_val) is True and on_mkl is False:
-                            is_supported = False
-                if each_key == 'support-accuracy':
-                    if each_val is not None:
-                        if ast.literal_eval(each_val) is False and accuracy_only is True:
-                            is_supported = False
+                if (
+                    each_key == 'mkl-only'
+                    and each_val is not None
+                    and ast.literal_eval(each_val) is True
+                    and on_mkl is False
+                ):
+                    is_supported = False
+                if (
+                    each_key == 'support-accuracy'
+                    and each_val is not None
+                    and ast.literal_eval(each_val) is False
+                    and accuracy_only is True
+                ):
+                    is_supported = False
             if is_supported is True:
                 supported_sections.append(each_section)
 
@@ -267,9 +267,7 @@ class ConfigFile:
         columns_list = ['benchmark','model-name', 'mode', 'precision','patches','json-fname']
         for section in config.sections():
             index_list.append(section)
-            data = []
-            data.append(section)
-            data.append(config.get(section, columns_list[1]))
+            data = [section, config.get(section, columns_list[1])]
             data.append(config.get(section, columns_list[2]))
             data.append(config.get(section, columns_list[3]))
             data.append(config.get(section, columns_list[4]))
@@ -286,8 +284,7 @@ class ConfigFile:
     def read_value_from_section(self, topo_name, key):
         config = configparser.ConfigParser()
         config.read(self.configpath)
-        string_val = config.get(topo_name, key)
-        return string_val
+        return config.get(topo_name, key)
 
     def write_value_from_section(self, topo_name, key, val):
         config = configparser.ConfigParser()
@@ -306,7 +303,7 @@ class ConfigFile:
         for each_section in config.sections():
             if each_section == topo_name:
                 for each_key, each_val in config.items(each_section):
-                    key = '--' + each_key
+                    key = f'--{each_key}'
                     #if each_key == 'data-location':
                     #    if each_val is not None:
                     #        self.benchmark_only = False
@@ -326,22 +323,18 @@ class ConfigFile:
                         if each_val is not None:
                             self.preprocessing = each_val
                     elif each_key == 'data-location':
-                        if each_val is not None:
-                            if each_val != '':
-                                print("data-location : ", each_val)
-                                configs.append(key)
-                                configs.append(each_val)
-                                self.data_location = each_val
+                        if each_val is not None and each_val != '':
+                            print("data-location : ", each_val)
+                            configs.extend((key, each_val))
+                            self.data_location = each_val
                     elif each_key == 'in-graph':
                         if each_val != '':
-                            configs.append(key)
-                            configs.append(each_val)
+                            configs.extend((key, each_val))
                             self.in_graph = each_val
                         self.checkpoint = 'NA'
                     elif each_key == 'checkpoint':
                         if each_val != '':
-                            configs.append(key)
-                            configs.append(each_val)
+                            configs.extend((key, each_val))
                             self.checkpoint = each_val
                         self.in_graph = 'NA'
                     elif each_key == 'json-fname':
@@ -360,21 +353,18 @@ class ConfigFile:
                     elif each_key == 'support-accuracy':
                         if len(each_val) != 0 :
                             self.support_accuracy = ast.literal_eval(each_val)
-                    else:
-                        if len(each_val) != 0 :
-                            if each_val[0] == '=':
-                                configs.append(key+each_val)
-                            else:
-                                configs.append(key)
-                                configs.append(each_val)
-
+                    elif len(each_val) != 0:
+                        if each_val[0] == '=':
+                            configs.append(key+each_val)
+                        else:
+                            configs.extend((key, each_val))
         return configs
 
     def get_parameters(
             self, topo_name, configvals, batch_size=1, thread_number=1,
             socket_number=1, num_inter_threads=0, num_intra_threads=0, accuracy_only=False):
         benchmark_argvs = []
-        benchmark_argvs = benchmark_argvs + configvals
+        benchmark_argvs += configvals
         benchmark_argvs.append('--framework')
         benchmark_argvs.append('tensorflow')
         if batch_size > 0:
@@ -386,21 +376,21 @@ class ConfigFile:
             benchmark_argvs.append('--benchmark-only')
 
         if num_inter_threads > 0:
-            benchmark_argvs.append('--num_inter_threads=' + str(num_inter_threads))
-            benchmark_argvs.append('--data_num_inter_threads=' + str(num_inter_threads))
+            benchmark_argvs.append(f'--num_inter_threads={str(num_inter_threads)}')
+            benchmark_argvs.append(f'--data_num_inter_threads={str(num_inter_threads)}')
         else:
-            benchmark_argvs.append('--num_inter_threads=' + str(socket_number))
-            benchmark_argvs.append('--data_num_inter_threads=' + str(socket_number))
+            benchmark_argvs.append(f'--num_inter_threads={str(socket_number)}')
+            benchmark_argvs.append(f'--data_num_inter_threads={str(socket_number)}')
 
         if num_intra_threads > 0:
-            benchmark_argvs.append('--num_intra_threads=' + str(num_intra_threads))
-            benchmark_argvs.append('--data_num_intra_threads=' + str(num_intra_threads))
+            benchmark_argvs.append(f'--num_intra_threads={str(num_intra_threads)}')
+            benchmark_argvs.append(f'--data_num_intra_threads={str(num_intra_threads)}')
         else:
-            benchmark_argvs.append('--num_intra_threads=' + str(thread_number))
-            benchmark_argvs.append('--data_num_intra_threads=' + str(thread_number))
+            benchmark_argvs.append(f'--num_intra_threads={str(thread_number)}')
+            benchmark_argvs.append(f'--data_num_intra_threads={str(thread_number)}')
 
         if thread_number > 0:
-            benchmark_argvs.append('--num-cores=' + str(thread_number))
+            benchmark_argvs.append(f'--num-cores={str(thread_number)}')
         if socket_number == 1:
             benchmark_argvs.append('--socket-id')
             benchmark_argvs.append('0')
@@ -415,10 +405,10 @@ class ConfigFile:
         file_ext = full_filename.split('.')[-1]
         filename = full_filename.split('.')[0]
         cmd = ''
-        if file_ext == 'zip':
-            cmd = "unzip " + filepath
-        elif file_ext == 'gz':
-            cmd = "tar -xzvf  " + filepath
+        if file_ext == 'gz':
+            cmd = f"tar -xzvf  {filepath}"
+        elif file_ext == 'zip':
+            cmd = f"unzip {filepath}"
         if cmd != '':
             do_command(cmd)
             if os.path.exists(pretrainfd + os.sep + filename) is False:
@@ -440,7 +430,7 @@ class ConfigFile:
 
     def download_pretrained_model(self, pretrainfd='pretrained', current_path='./'):
         import shutil
-        cmd = "wget " + self.wget
+        cmd = f"wget {self.wget}"
         filename = self.wget.split('/')[-1]
         pretrain_model_path = current_path + os.sep + pretrainfd + os.sep + filename
         if os.path.exists(pretrain_model_path) is True:
@@ -465,7 +455,7 @@ class ConfigFile:
         print(self.patches)
         patch_path = patch_fd + os.sep + self.patches
         if os.path.exists(patch_path) is True:
-            cmd = "git am " + patch_path
+            cmd = f"git am {patch_path}"
             print(cmd)
             do_command(cmd)
             self.patched = True
@@ -482,7 +472,7 @@ class ConfigFile:
             cmd = "git reset HEAD^ "
             print(cmd)
             do_command(cmd)
-            cmd = "git checkout " + model_path + "*"
+            cmd = f"git checkout {model_path}*"
             print(cmd)
             do_command(cmd)
         return
@@ -493,17 +483,19 @@ class PerfPresenter:
     def __init__(self, showAbsNumber=False):
         self.tf_util = TensorflowUtils()
         self.showAbsNumber = showAbsNumber
-        pass
 
     def autolabel(self, ax, rects):
         """Attach a text label above each bar in *rects*, displaying its height."""
         for rect in rects:
             height = rect.get_height()
             ax.annotate(
-                '{}'.format(height),
+                f'{height}',
                 xy=(rect.get_x() + rect.get_width() / 2, height),
-                xytext=(0, 3), textcoords='offset points',
-                ha='center', va='bottom')
+                xytext=(0, 3),
+                textcoords='offset points',
+                ha='center',
+                va='bottom',
+            )
 
     def draw_perf_diag(self, topo_name, a_means, b_means, a_label, b_label):
         import matplotlib.pyplot as plt
@@ -599,10 +591,6 @@ class PerfPresenter:
         f = open(filepath, 'r')
         col1 = []
         col2 = []
-        mean1 = 0
-        mean2 = 0
-        stdev1 = 0
-        stdev2 = 0
         with f:
             reader = csv.DictReader(f)
             for row in reader:
@@ -611,14 +599,10 @@ class PerfPresenter:
                 else:
                     col2.append(float(row[framename]))
 
-        if len(col1) > 0:
-            mean1 = statistics.mean(col1)
-        if len(col2) > 0:
-            mean2 = statistics.mean(col2)
-        if len(col1) > 1:
-            stdev1 = statistics.stdev(col1)
-        if len(col2) > 1:
-            stdev2 = statistics.stdev(col2)
+        mean1 = statistics.mean(col1) if col1 else 0
+        mean2 = statistics.mean(col2) if col2 else 0
+        stdev1 = statistics.stdev(col1) if len(col1) > 1 else 0
+        stdev2 = statistics.stdev(col2) if len(col2) > 1 else 0
         return (mean1, mean2, len(col1), len(col2), stdev1, stdev2)
 
     def plot_perf_graph(self, ylabel, xlabel, stock_number, intel_number, stock_stdev, intel_stdev):
@@ -696,29 +680,22 @@ class PerfPresenter:
     def draw_perf_diag_from_csv(self, filepath, framename, y_axis_name, title):
         if self.showAbsNumber is False:
             return
-        stock_means = []
-        intel_means = []
-        stock_stdev = []
-        intel_stdev = []
         mean1, mean2, len1, len2, stdev1, stdev2 = self.read_number_from_csv(filepath, framename)
-        stock_means.append(float(mean2))
-        intel_means.append(float(mean1))
-        stock_stdev.append(float(stdev2))
-        intel_stdev.append(float(stdev1))
+        stock_means = [float(mean2)]
+        intel_means = [float(mean1)]
+        stock_stdev = [float(stdev2)]
+        intel_stdev = [float(stdev1)]
         self.plot_perf_graph(y_axis_name, title, stock_means, intel_means, stock_stdev, intel_stdev)
 
     def draw_perf_ratio_diag_from_csv(self, filepath, framename, y_axis_name, title):
         stock_ratio_means = [1]
-        intel_ratio_means = []
-        stock_stdev = []
-        intel_stdev = []
         mean1, mean2, len1, len2, stdev1, stdev2 = self.read_number_from_csv(filepath, framename)
         if mean1 is 0 or mean2 is 0:
             print("ERROR. Users must run the benchmark with both Stock TF and Intel TF\n")
             return
-        intel_ratio_means.append(float(mean1 / mean2))
-        stock_stdev.append(float(stdev2 / mean2))
-        intel_stdev.append(float(stdev1 / mean1))
+        intel_ratio_means = [float(mean1 / mean2)]
+        stock_stdev = [float(stdev2 / mean2)]
+        intel_stdev = [float(stdev1 / mean1)]
         self.plot_perf_graph(y_axis_name, title, stock_ratio_means, intel_ratio_means, stock_stdev, intel_stdev)
 
     def draw_perf_diag_from_csvs(self, filepath_list,label_list ,framename, y_axis_name, x_axis_name, title, analyze_mkl=True):
@@ -744,24 +721,22 @@ class PerfPresenter:
         means_list = []
         stddev_list = []
         dividend = 0
+        ratio_stddev = []
         for filepath in filepath_list:
             means = []
-            stdev = []
             ratio_means = []
-            ratio_stddev = []
             mean1, mean2, len1, len2, stdev1, stdev2 = self.read_number_from_csv(filepath, framename)
             if analyze_mkl == True:
                 means.append(float(mean1))
-                stdev.append(0)
                 if dividend == 0:
                     dividend = mean1
                 ratio_means.append(float(mean1 / dividend))
             else:
                 means.append(float(mean2))
-                stdev.append(0)
                 if dividend == 0:
                     dividend = mean2
                 ratio_means.append(float(mean2 / dividend))
+            stdev = [0]
             means_list.append(ratio_means)
             stddev_list.append(stdev)
         self.plot_perf_graph_v2(y_axis_name, x_axis_name, means_list, stddev_list, filepath_list, label_list,title=title)
@@ -770,10 +745,7 @@ class PerfPresenter:
         output = str(output)
         output = output.split("\n")
         lines = output[0].split('\\')
-        for l in lines:
-            if l.find("Throughput") > 0:
-                return l
-        return None
+        return next((l for l in lines if l.find("Throughput") > 0), None)
 
     def read_throughput(self, filepath, keyword='Throughput', index=1):
         number = None
@@ -844,8 +816,8 @@ class TFTimelinePresenter:
         allkeys = [item for sublist in allkeys for item in iter(sublist)]
         allkeys = sorted(set(allkeys))
         argkeys = [js['args'].keys() for js in j['traceEvents'] if 'args' in js]
-        argkeys = sorted(set([item for sublist in argkeys for item in iter(sublist)]))
-        argkeys = ['arg_' + k for k in argkeys]
+        argkeys = sorted({item for sublist in argkeys for item in iter(sublist)})
+        argkeys = [f'arg_{k}' for k in argkeys]
         entries = []
         for i, e in enumerate(j['traceEvents']):
             if maxents != 0 and i > maxents:
@@ -854,28 +826,27 @@ class TFTimelinePresenter:
             for k, v in e.items():
                 if k == 'args':
                     for a in v.keys():
-                        ent['arg_' + a] = str(v[a])
+                        ent[f'arg_{a}'] = str(v[a])
 
                 else:
                     ent[k] = str(v)
 
             entries.append(ent)
 
-        df = pd.DataFrame(entries)
-        return df
+        return pd.DataFrame(entries)
 
     def summarize_item(self, tl, item, ascending=False):
         return tl.groupby([item])['dur'].sum().sort_values(ascending=ascending)
 
     def summarize_barh(self, tl, item, topk=15, ascending=False, ax=None, title=None, figsize=None, logx=False):
-        ret = self.summarize_item(tl, item, ascending)[:topk].plot.barh(
-            ax=ax, title=title, figsize=figsize, logx=False)
-        return ret
+        return self.summarize_item(tl, item, ascending)[:topk].plot.barh(
+            ax=ax, title=title, figsize=figsize, logx=False
+        )
 
     def summarize_pie(self, tl, item, topk=15, ascending=False, ax=None, title=None, figsize=None, logx=False):
-        ret = self.summarize_item(tl, item, ascending)[:topk].plot.pie(
-            ax=ax, title=title, figsize=figsize, logx=logx, autopct='%1.1f%%')
-        return ret
+        return self.summarize_item(tl, item, ascending)[:topk].plot.pie(
+            ax=ax, title=title, figsize=figsize, logx=logx, autopct='%1.1f%%'
+        )
 
     def opname(self, x):
         return self.demangle(x.split('/')[(-1)])
@@ -899,9 +870,9 @@ class TFTimelinePresenter:
         z = x.split('::')
         try:
             if short:
-                return z[0] + '::' + cxxfilt.demangle(z[1]).split('<')[0]
+                return f'{z[0]}::' + cxxfilt.demangle(z[1]).split('<')[0]
             else:
-                return z[0] + '::' + cxxfilt.demangle(z[1])
+                return f'{z[0]}::{cxxfilt.demangle(z[1])}'
         except IndexError:
             return x
 
@@ -910,7 +881,7 @@ class TFTimelinePresenter:
         import csv
         filename = fn.split('.')[0] + '.csv'
         f = open(filename, 'w')
-        time_col_name = 'elapsed_time_' + tfile_prefix
+        time_col_name = f'elapsed_time_{tfile_prefix}'
         with f:
             fnames = ['op', time_col_name, 'speedup', 'mkl_op']
             writer = csv.DictWriter(f, fieldnames=fnames)
@@ -927,21 +898,18 @@ class TFTimelinePresenter:
                     op_name = sitems.index[x].strip('_')
                 writer.writerow({'op': op_name, time_col_name: sitems[x], 'speedup': 0, 'mkl_op': mkl_op})
                 x = x + 1
-        ret = None
-        if self.showAbsNumber is True:
-            ret = sitems
-        return ret
+        return sitems if self.showAbsNumber is True else None
 
     def plot_summary_barth(self, timeline_pd, tfile_prefix):
-        filename = tfile_prefix + '_tf_op_duration_bar.png'
-        title_ = tfile_prefix + 'TF : op duration bar chart'
+        filename = f'{tfile_prefix}_tf_op_duration_bar.png'
+        title_ = f'{tfile_prefix}TF : op duration bar chart'
         ax = self.summarize_barh(timeline_pd, 'arg_op', title=title_, topk=50, logx=True, figsize=(10,
                                                                                                    10))
         ax.figure.savefig(filename, bbox_inches='tight')
 
     def plot_summary_pie(self, timeline_pd, tfile_prefix):
-        filename = tfile_prefix + '_tf_op_duration_pie.png'
-        title_ = tfile_prefix + 'TF : op duration pie chart'
+        filename = f'{tfile_prefix}_tf_op_duration_pie.png'
+        title_ = f'{tfile_prefix}TF : op duration pie chart'
         timeline_pd_known = timeline_pd[(~timeline_pd['arg_op'].str.contains('unknown'))]
         ax = self.summarize_pie(timeline_pd_known, 'arg_op', title=title_, topk=50, logx=True, figsize=(10,
                                                                                                         10))
@@ -967,7 +935,7 @@ class TFTimelinePresenter:
         extra = extra.rename(columns={extra.columns.values[1]: tag1})
         extra = extra.drop(columns=['speedup'])
         common_time = common[common.columns.values[1]].sum(axis=0)
-        append_op = 'Common ops with '+tag2
+        append_op = f'Common ops with {tag2}'
         to_append = [append_op, common_time, True]
         series = pd.Series(to_append, index = extra.columns)
         extra = extra.append(series, ignore_index=True)
@@ -1006,9 +974,9 @@ class TFTimelinePresenter:
         from matplotlib import rcParams
         import os
         if chart_type == 'bar':
-            imgfiles = [x for x in os.listdir('.') if '_tf_op_duration_bar.png' == x[-23:]]
+            imgfiles = [x for x in os.listdir('.') if x[-23:] == '_tf_op_duration_bar.png']
         elif chart_type == 'pie':
-            imgfiles = [x for x in os.listdir('.') if '_tf_op_duration_pie.png' == x[-23:]]
+            imgfiles = [x for x in os.listdir('.') if x[-23:] == '_tf_op_duration_pie.png']
         else:
             return
         rcParams['figure.figsize'] = (30, 30)
@@ -1035,7 +1003,7 @@ class TFTimelinePresenter:
         index = 0
         for row in reader:
             if row['op'] != 'unknown' and index < num_hotspots:
-                xlabels.append(row[item_name] + "_(mkl-" + str(row['mkl_op']) + ')')
+                xlabels.append(f"{row[item_name]}_(mkl-" + str(row['mkl_op']) + ')')
                 b_means.append(float(row[b_name]))
                 a_means.append(float(row[a_name]))
                 index = index + 1

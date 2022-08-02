@@ -151,34 +151,24 @@ def train_input_generator(x_train, y_train, batch_size=64):
 def main(unused_argv):
   # Initialize Horovod
   hvd.init()
-    # Keras automatically creates a cache directory in ~/.keras/datasets for
-    # storing the downloaded MNIST data. This creates a race
-    # condition among the workers that share the same filesystem. If the
-    # directory already exists by the time this worker gets around to creating
-    # it, ignore the resulting exception and continue.
-  cache_dir = os.path.join(os.path.expanduser('~'), '.keras', 'datasets') 
+  cache_dir = os.path.join(os.path.expanduser('~'), '.keras', 'datasets')
   if not os.path.exists(cache_dir):
-        try:
-            os.mkdir(cache_dir)
-        except OSError as e:
-            if e.errno == errno.EEXIST and os.path.isdir(cache_dir):
-                pass
-            else:
-                raise
-                
+    try:
+      os.mkdir(cache_dir)
+    except OSError as e:
+      if e.errno != errno.EEXIST or not os.path.isdir(cache_dir):
+        raise
+
   # Load training and eval data
   # Download and load MNIST dataset.
   (x_train, y_train), (x_test, y_test) = \
         keras.datasets.mnist.load_data('MNIST-data-%d' % hvd.rank())
-   # The shape of downloaded data is (-1, 28, 28), hence we need to reshape it
-    # into (-1, 784) to feed into our network. Also, need to normalize the
-    # features between 0 and 1.
   x_train = np.reshape(x_train, (-1, 784)) / 255.0
   x_test = np.reshape(x_test, (-1, 784)) / 255.0
   # Build model...
   with tf.compat.v1.name_scope('input'):
         image = tf.compat.v1.placeholder(tf.float32, [None, 784], name='image')
-        label = tf.compat.v1.placeholder(tf.float32, [None], name='label') 
+        label = tf.compat.v1.placeholder(tf.float32, [None], name='label')
   predict, loss = cnn_model_fn(image, label, tf.estimator.ModeKeys.TRAIN)
 
   # Horovod: adjust learning rate based on number of MPI Tasks.
@@ -206,17 +196,13 @@ def main(unused_argv):
   checkpoint_dir = './checkpoints' if hvd.rank() == 0 else None
   training_batch_generator = train_input_generator(x_train,
                                                      y_train, batch_size=100)
-    # The MonitoredTrainingSession takes care of session initialization,
-    # restoring from a checkpoint, saving to a checkpoint, and closing when done
-    # or an error occurs.
-    
   config = tf.compat.v1.ConfigProto()
 #  config.inter_op_parallelism_threads = 2
 #  config.intra_op_parallelism_threads = 4
-  
+
 
   time_start = time.time()
-  
+
   with tf.compat.v1.train.MonitoredTrainingSession(checkpoint_dir=checkpoint_dir,
                                            hooks=hooks,
                                            config=config) as mon_sess:
@@ -224,7 +210,7 @@ def main(unused_argv):
             # Run a training step synchronously.
             image_, label_ = next(training_batch_generator)
             mon_sess.run(train_op, feed_dict={image: image_, label: label_}) 
-  
+
   if hvd.rank() == 0:
         print('============================')
         print('Number of tasks: ', hvd.size())

@@ -58,18 +58,16 @@ class FileUtils:
     def __init_(self):
         return
     def replace_string_in_file(self, filename, oldstring, newstring):
-        fin = open(filename, "rt")
+      with open(filename, "rt") as fin:
         #output file to write the result to
         fout = open('tmp.txt', "wt")
         #for each line in the input file
         for line in fin:
             #read replace the string and write to output file
             fout.write(line.replace(oldstring, newstring))
-        #close input and output files
-        fin.close()
-        fout.close()
-        os.remove(filename)
-        os.rename('tmp.txt',filename)
+      fout.close()
+      os.remove(filename)
+      os.rename('tmp.txt',filename)
 
 
 class oneDNNLog:
@@ -82,62 +80,106 @@ class oneDNNLog:
         return
 
     def load_log(self, log):
-        self.filename = log
-        self.with_timestamp = True
-        data = self.load_log_dnnl_timestamp(log)
-        count = data['time'].count()
+      self.filename = log
+      self.with_timestamp = True
+      data = self.load_log_dnnl_timestamp(log)
+      count = data['time'].count()
 
-        if count <= 1:
-            data = self.load_log_dnnl(log)
-            count = data['time'].count()
-            self.with_timestamp = False
+      if count <= 1:
+          data = self.load_log_dnnl(log)
+          count = data['time'].count()
+          self.with_timestamp = False
 
-        if count == 0:
-            data = self.load_log_mkldnn(log)
-            count = data['time'].count()
-            self.with_timestamp = False
+      if count == 0:
+          data = self.load_log_mkldnn(log)
+          count = data['time'].count()
+          self.with_timestamp = False
 
-        exec_data = data[data['exec'] == 'exec']
-        self.data = data
-        self.exec_data = exec_data
+      exec_data = data[data['exec'] == 'exec']
+      self.data = data
+      self.exec_data = exec_data
 
-        if self.with_timestamp is True:
-            import io
-            with io.open('./oneDNN.json', mode='wb') as fh:
-                tp = TraceProfiler(output=fh)
-                tp.install()
-                for index, row in self.data.iterrows():
-                    if row["time"] != None and row["time"].find('.') != -1:
-                        tp.fire_event(
-                            event_type='exec',
-                            event_name=row["type"],
-                            event_cat='DNNL_Op',
-                            kernel_name=row["jit"],
-                            timestamp=str(float(row["timestamp"])*1000),
-                            duration=str(float(row["time"])*1000),
-                            pass_type=row["pass"],
-                        )
-                tp.shutdown()
-        return
+      if self.with_timestamp:
+        import io
+        with io.open('./oneDNN.json', mode='wb') as fh:
+            tp = TraceProfiler(output=fh)
+            tp.install()
+            for index, row in self.data.iterrows():
+                if row["time"] != None and row["time"].find('.') != -1:
+                    tp.fire_event(
+                        event_type='exec',
+                        event_name=row["type"],
+                        event_cat='DNNL_Op',
+                        kernel_name=row["jit"],
+                        timestamp=str(float(row["timestamp"])*1000),
+                        duration=str(float(row["time"])*1000),
+                        pass_type=row["pass"],
+                    )
+            tp.shutdown()
+      return
 
     def load_log_dnnl(self, log):
-        import pandas as pd
-        # dnnl_verbose,exec,cpu,convolution,jit:avx2,forward_inference,src_f32::blocked:abcd:f0 wei_f32::blocked:Acdb8a:f0 bia_f32::blocked:a:f0 dst_f32::blocked:aBcd8b:f0,,alg:convolution_direct,mb1_ic3oc96_ih227oh55kh11sh4dh0ph0_iw227ow55kw11sw4dw0pw0,1.21704
-        data = pd.read_csv(log, names=[ 'dnnl_verbose','exec','arch','type', 'jit', 'pass', 'fmt', 'opt', 'alg', 'shape', 'time', 'dummy'], engine='python')
-        return data
+      import pandas as pd
+      return pd.read_csv(
+          log,
+          names=[
+              'dnnl_verbose',
+              'exec',
+              'arch',
+              'type',
+              'jit',
+              'pass',
+              'fmt',
+              'opt',
+              'alg',
+              'shape',
+              'time',
+              'dummy',
+          ],
+          engine='python',
+      )
 
     def load_log_dnnl_timestamp(self, log):
-        import pandas as pd
-        # dnnl_verbose,629411020589.218018,exec,cpu,convolution,jit:avx2,forward_inference,src_f32::blocked:abcd:f0 wei_f32::blocked:Acdb8a:f0 bia_f32::blocked:a:f0 dst_f32::blocked:aBcd8b:f0,,alg:convolution_direct,mb1_ic3oc96_ih227oh55kh11sh4dh0ph0_iw227ow55kw11sw4dw0pw0,1.21704
-        data = pd.read_csv(log, names=[ 'dnnl_verbose','timestamp','exec','arch','type', 'jit', 'pass', 'fmt', 'opt', 'alg', 'shape', 'time', 'dummy'], engine='python')
-        return data
+      import pandas as pd
+      return pd.read_csv(
+          log,
+          names=[
+              'dnnl_verbose',
+              'timestamp',
+              'exec',
+              'arch',
+              'type',
+              'jit',
+              'pass',
+              'fmt',
+              'opt',
+              'alg',
+              'shape',
+              'time',
+              'dummy',
+          ],
+          engine='python',
+      )
 
     def load_log_mkldnn(self, log):
-        import pandas as pd
-        #mkldnn_verbose,exec,convolution,jit:avx512_common,forward_training,fsrc:nChw16c fwei:OIhw16i16o fbia:undef fdst:nChw16c,alg:convolution_direct,mb100_ic128oc32_ih7oh7kh3sh1dh0ph1_iw7ow7kw3sw1dw0pw1,0.201904
-        print("load_log_mkldnn")
-        data = pd.read_csv(log, names=[ 'mkldnn_verbose','exec','type', 'jit', 'pass', 'fmt', 'alg', 'shape', 'time'], engine='python')
-        return data
+      import pandas as pd
+      #mkldnn_verbose,exec,convolution,jit:avx512_common,forward_training,fsrc:nChw16c fwei:OIhw16i16o fbia:undef fdst:nChw16c,alg:convolution_direct,mb100_ic128oc32_ih7oh7kh3sh1dh0ph1_iw7ow7kw3sw1dw0pw1,0.201904
+      print("load_log_mkldnn")
+      return pd.read_csv(
+          log,
+          names=[
+              'mkldnn_verbose',
+              'exec',
+              'type',
+              'jit',
+              'pass',
+              'fmt',
+              'alg',
+              'shape',
+              'time',
+          ],
+          engine='python',
+      )
 
 
 class oneDNNUtils:
@@ -152,70 +194,69 @@ class oneDNNUtils:
         return
 
     def breakdown(self, data, Group, Type):
-        import matplotlib.pyplot as plt
-        fig = plt.figure(figsize=(18, 15))
-        ax = fig.add_subplot(111)
-        figsize=(10,10)
-        topk=50
-        try:
-            if Type == "time":
-                print()
-                print(' breakdown:',Group)
-                data['time'] = data['time'].astype(float)
-                time = data.groupby(Group)['time'].sum().sort_values().head(topk)
-                print(time)
-                title=Group + "Time Breakdown"
-                time[:topk].plot.pie(
-                    ax=ax, title=title, figsize=figsize, logx=True, autopct='%1.1f%%')
-                ax.figure.savefig(title)
-            elif Type == "count":
-                print()
-                count = data[Group].value_counts().head(topk)
-                print(count)
-                title=Group+"Count Breakdown"
-                count[:topk].plot.bar(
-                    ax=ax, title=title, figsize=figsize, logx=False, rot=45)
-                ax.figure.savefig(title)
-        except:
-            print("Exception!")
-            pass
-        return
+      import matplotlib.pyplot as plt
+      fig = plt.figure(figsize=(18, 15))
+      ax = fig.add_subplot(111)
+      figsize=(10,10)
+      topk=50
+      try:
+        if Type == "time":
+          print()
+          print(' breakdown:',Group)
+          data['time'] = data['time'].astype(float)
+          time = data.groupby(Group)['time'].sum().sort_values().head(topk)
+          print(time)
+          title = f"{Group}Time Breakdown"
+          time[:topk].plot.pie(
+              ax=ax, title=title, figsize=figsize, logx=True, autopct='%1.1f%%')
+          ax.figure.savefig(title)
+        elif Type == "count":
+          print()
+          count = data[Group].value_counts().head(topk)
+          print(count)
+          title = f"{Group}Count Breakdown"
+          count[:topk].plot.bar(
+              ax=ax, title=title, figsize=figsize, logx=False, rot=45)
+          ax.figure.savefig(title)
+      except:
+        print("Exception!")
+      return
 
     def stats_comp(self, name, Type,onednn_log1, onednn_log2, n=50):
-        import pandas as pd
-        import matplotlib.pyplot as plt
-        fig = plt.figure(figsize=(18, 15))
-        ax = fig.add_subplot(111)
-        figsize=(10,10)
-        topk=50
+      import pandas as pd
+      import matplotlib.pyplot as plt
+      fig = plt.figure(figsize=(18, 15))
+      ax = fig.add_subplot(111)
+      figsize=(10,10)
+      topk=50
 
-        d1 = onednn_log1.exec_data
-        log1 = onednn_log1.filename
-        d2 = onednn_log2.exec_data
-        log2 = onednn_log2.filename
-        print(name, 'stats:')
-        if Type == "count":
-            jitstat = pd.concat((d1[name].value_counts(), d2[name].value_counts()), axis=1, sort=True)
-            jitstat.columns = ('1-' + log1, '2-' + log2)
-            jitstat['run2/run1'] = jitstat.iloc[:, 1].astype(float) / jitstat.iloc[:, 0].astype(float)
-            jitstat_count = jitstat.sort_values('1-' + log1, ascending=False).head(n)
-            print(jitstat_count)
-        elif Type == "time":
-            d1['time'] = d1['time'].astype(float)
-            d2['time'] = d2['time'].astype(float)
-            jitstat = pd.concat((d1.groupby(name)['time'].sum(), d2.groupby(name)['time'].sum()), axis=1, sort=True)
-            jitstat.columns = ('1-' + log1, '2-' + log2)
-            jitstat['run2/run1'] = jitstat.iloc[:, 1].astype(float) / jitstat.iloc[:, 0].astype(float)
-            jitstat_time = jitstat.sort_values('1-' + log1, ascending=False).head(n)
-            print(jitstat_time)
-            title=name + " run2/run1 Time Comparison"
-            jitstat_compare = jitstat_time.drop(columns=['1-' + log1, '2-' + log2])
-            if len(jitstat_compare) == 0:
-                return
-            jitstat_compare[:topk].plot.bar(
-                ax=ax, title=title, figsize=figsize, logx=False, rot=45)
-            filename = name + " Time Comparison"
-            ax.figure.savefig(filename)
+      d1 = onednn_log1.exec_data
+      log1 = onednn_log1.filename
+      d2 = onednn_log2.exec_data
+      log2 = onednn_log2.filename
+      print(name, 'stats:')
+      if Type == "count":
+        jitstat = pd.concat((d1[name].value_counts(), d2[name].value_counts()), axis=1, sort=True)
+        jitstat.columns = f'1-{log1}', f'2-{log2}'
+        jitstat['run2/run1'] = jitstat.iloc[:, 1].astype(float) / jitstat.iloc[:, 0].astype(float)
+        jitstat_count = jitstat.sort_values(f'1-{log1}', ascending=False).head(n)
+        print(jitstat_count)
+      elif Type == "time":
+        d1['time'] = d1['time'].astype(float)
+        d2['time'] = d2['time'].astype(float)
+        jitstat = pd.concat((d1.groupby(name)['time'].sum(), d2.groupby(name)['time'].sum()), axis=1, sort=True)
+        jitstat.columns = f'1-{log1}', f'2-{log2}'
+        jitstat['run2/run1'] = jitstat.iloc[:, 1].astype(float) / jitstat.iloc[:, 0].astype(float)
+        jitstat_time = jitstat.sort_values(f'1-{log1}', ascending=False).head(n)
+        print(jitstat_time)
+        title = f"{name} run2/run1 Time Comparison"
+        jitstat_compare = jitstat_time.drop(columns=[f'1-{log1}', f'2-{log2}'])
+        if len(jitstat_compare) == 0:
+            return
+        jitstat_compare[:topk].plot.bar(
+            ax=ax, title=title, figsize=figsize, logx=False, rot=45)
+        filename = f"{name} Time Comparison"
+        ax.figure.savefig(filename)
     def parse_raw_output_to_csv(self, filepath, csvpath='mkldnn_log.csv', keyword='dnnl_verbose'):
         #filepath = 'Iliad.txt'
         import csv

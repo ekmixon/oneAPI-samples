@@ -17,7 +17,7 @@ def save_int8_frezon_pb(q_model, path):
     from tensorflow.python.platform import gfile
     f = gfile.GFile(path, 'wb')
     f.write(q_model.as_graph_def().SerializeToString())
-    print("Save to {}".format(path))
+    print(f"Save to {path}")
 
 
 class Dataloader(object):
@@ -42,12 +42,12 @@ def auto_tune(input_graph_path, yaml_config, batch_size):
     quan = lpot.Quantization(yaml_config)
     dataloader = Dataloader(batch_size)
 
-    q_model = quan(
+    return quan(
         fp32_graph,
         q_dataloader=dataloader,
         eval_func=None,
-        eval_dataloader=dataloader)
-    return q_model
+        eval_dataloader=dataloader,
+    )
 
 
 yaml_file = "alexnet.yaml"

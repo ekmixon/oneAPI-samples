@@ -12,6 +12,7 @@ SPDX-License-Identifier: MIT
 =============================================================
 '''
 
+
 # # Daal4py K-Means Clustering Example for Distributed Memory Systems [SPMD mode]
 
 # ## IMPORTANT NOTICE
@@ -48,7 +49,8 @@ d4p.daalinit() #initializes the distribution engine
 
 # organizing variables used in the model for prediction
 # each process gets its own data
-infile = "./data/distributed_data/daal4py_Distributed_Kmeans_" + str(d4p.my_procid()+1) + ".csv"
+infile = f"./data/distributed_data/daal4py_Distributed_Kmeans_{str(d4p.my_procid()+1)}.csv"
+
 
 # read data
 X = pd.read_csv(infile)
@@ -74,7 +76,10 @@ init_result = d4p.kmeans_init(nClusters = 3, method = "plusPlusDense", distribut
 centroids = init_result.centroids
 print("Here our centroids:\n\n\n", centroids, "\n")
 
-centroids_filename = './models/kmeans_clustering_initcentroids_'+  str(d4p.my_procid()+1) + '.csv'
+centroids_filename = (
+    f'./models/kmeans_clustering_initcentroids_{str(d4p.my_procid()+1)}.csv'
+)
+
 
 # saving centroids to a file
 pickle.dump(centroids, open(centroids_filename, "wb"))
@@ -117,7 +122,8 @@ print("Here is our cluster assignments for first 5 datapoints: \n\n", assignment
 
 
 # now export the results to a CSV file
-results_filename = "./results/daal4py_Distributed_Kmeans_results_" + str(d4p.my_procid()+1) + ".csv"
+results_filename = f"./results/daal4py_Distributed_Kmeans_results_{str(d4p.my_procid()+1)}.csv"
+
 np.savetxt(results_filename, assignments, delimiter=",")
 
 d4p.daalfini() # stops the distribution engine

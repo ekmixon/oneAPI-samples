@@ -8,7 +8,7 @@ def read_data():
     print("Loading data ...")
     mnist = tf.keras.datasets.mnist.load_data()
     # print("Converting data ...")
-    
+
     (x_train, label_train), (x_test, label_test) = mnist
 
     x_train = x_train.astype('float32')
